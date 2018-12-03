@@ -1,6 +1,7 @@
 <?php namespace Markok\Eloquent\Traits;
 
 use Markok\Eloquent\Relations\BelongsToDynamic as Relation;
+use Illuminate\Support\Str;
 
 trait BelongsToDynamic
 {
