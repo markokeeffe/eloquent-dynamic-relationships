@@ -5,6 +5,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property \Illuminate\Database\Eloquent\Builder $query
+ */
 class BelongsToDynamic extends BelongsTo
 {
     protected $subQuery;
@@ -29,14 +33,17 @@ class BelongsToDynamic extends BelongsTo
     {
         if (static::$constraints) {
             if (!$this->child->{$this->foreignKey}) {
+                $subQuery = clone $this->subQuery;
                 // Execute the subQuery with a condition to find the dynamic value with a
                 // foreign key matching the primary key value of the child model
-                $value = $this->subQuery
+                $result = $subQuery
+                    ->select($this->subQueryForeignKey)
                     ->where($this->subQueryOwnerKey, $this->child->getKey())
-                    ->first()
-                    ->getAttribute($this->subQueryForeignKey);
-
-                $this->child->setAttribute($this->foreignKey, $value);
+                    ->first();
+                if ($result) {
+                    $value = $result->getAttribute($this->subQueryForeignKey);
+                    $this->child->setAttribute($this->foreignKey, $value);
+                }
             }
             parent::addConstraints();
         }
@@ -52,6 +59,8 @@ class BelongsToDynamic extends BelongsTo
     {
         // Get an array of 'key' values for the attribute of the child model that is used in the dynamic relationship
         $keyValues = $this->getEagerModelKeys($models);
+
+        $this->query = clone $this->subQuery;
 
         $this->query->whereIn($this->subQueryOwnerKey, $keyValues);
     }
@@ -109,6 +118,10 @@ class BelongsToDynamic extends BelongsTo
         $dictionary = [];
 
         foreach ($results as $result) {
+            // Only allow one model match for each 'owner' value
+            if (isset($dictionary[$result->getAttribute($owner)])) {
+                continue;
+            }
             $dictionary[$result->getAttribute($owner)] = $result;
         }
 
